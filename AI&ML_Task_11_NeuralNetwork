@@ -1,0 +1,69 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import classification_report
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+
+# Load dataset
+df = pd.read_csv(r'D:\studies\Mamoona\AI&ML_Intern\preprocessed_cereal.csv')
+
+# Create classification target
+bins = [0, 40, 70, 100]
+labels = ['Low', 'Medium', 'High']
+df['rating_class'] = pd.cut(df['rating'], bins=bins, labels=labels)
+df.drop(columns='rating', inplace=True)
+
+# Features and labels
+X = df.drop(columns='rating_class')
+y = df['rating_class']
+
+# Encode target
+le = LabelEncoder()
+y_encoded = le.fit_transform(y)  # Converts to 0, 1, 2
+y_categorical = to_categorical(y_encoded)  # Converts to one-hot encoded
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_categorical, test_size=0.2, stratify=y_encoded, random_state=42
+)
+
+# Normalize features
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# Build neural network
+model = Sequential()
+model.add(Dense(64, activation='relu', input_shape=(X_train.shape[1],)))
+model.add(Dropout(0.3))
+model.add(Dense(32, activation='relu'))
+model.add(Dense(3, activation='softmax'))  # 3 classes: Low, Medium, High
+
+# Compile model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train model
+history = model.fit(X_train, y_train, epochs=50, batch_size=8, validation_split=0.1, verbose=1)
+
+# Evaluate on test set
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f'\nTest Accuracy: {accuracy:.4f}')
+
+# Predict and generate classification report
+y_pred_probs = model.predict(X_test)
+y_pred = np.argmax(y_pred_probs, axis=1)
+y_true = np.argmax(y_test, axis=1)
+
+target_names = ['High', 'Low', 'Medium']  # Use same order as LabelEncoder if known
+print("\n=== Classification Report ===")
+print(classification_report(
+    y_true,
+    y_pred,
+    labels=[0, 1, 2],  # Ensures all classes are reported
+    target_names=target_names,
+    zero_division=0
+))
